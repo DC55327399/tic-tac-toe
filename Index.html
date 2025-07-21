@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tic Tac Toe with AI</title>
+  <style>
+    /* Reset & base */
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      padding: 40px 20px;
+      color: #fff;
+      user-select: none;
+    }
+
+    h1 {
+      font-weight: 700;
+      font-size: 3rem;
+      margin-bottom: 20px;
+      text-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    }
+
+    #game {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(80px,120px));
+      grid-template-rows: repeat(3, minmax(80px,120px));
+      gap: 15px;
+      background: rgba(255, 255, 255, 0.15);
+      padding: 20px;
+      border-radius: 15px;
+      box-shadow:
+        0 0 10px rgba(0,0,0,0.2),
+        inset 0 0 10px rgba(255,255,255,0.3);
+    }
+
+    .cell {
+      background: rgba(255,255,255,0.1);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 3.5rem;
+      font-weight: 900;
+      color: #fefefe;
+      box-shadow:
+        0 8px 15px rgba(0,0,0,0.25),
+        inset 0 4px 8px rgba(255,255,255,0.2);
+      cursor: pointer;
+      transition:
+        background-color 0.3s ease,
+        color 0.3s ease,
+        transform 0.1s ease;
+      user-select: none;
+    }
+
+    .cell:hover {
+      background-color: rgba(255,255,255,0.25);
+      color: #ffeb3b;
+      transform: scale(1.05);
+    }
+
+    .cell.taken {
+      cursor: not-allowed;
+      color: #b0bec5;
+      background-color: rgba(255,255,255,0.05);
+    }
+
+    #status {
+      margin-top: 30px;
+      font-size: 1.5rem;
+      min-height: 2rem;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+      text-align: center;
+      font-weight: 700;
+    }
+
+    #restartBtn {
+      margin-top: 25px;
+      background-color: #8e44ad;
+      color: white;
+      border: none;
+      padding: 12px 32px;
+      font-size: 1.1rem;
+      border-radius: 25px;
+      box-shadow: 0 6px 10px rgba(142, 68, 173, 0.6);
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    #restartBtn:hover {
+      background-color: #732d91;
+      box-shadow: 0 8px 15px rgba(115, 45, 145, 0.8);
+      transform: translateY(-2px);
+    }
+
+    /* Responsive */
+    @media(max-width: 400px) {
+      #game {
+        grid-template-columns: repeat(3, 80px);
+        grid-template-rows: repeat(3, 80px);
+        gap: 10px;
+        padding: 15px;
+      }
+      .cell {
+        font-size: 2.5rem;
+        border-radius: 10px;
+      }
+      h1 {
+        font-size: 2.2rem;
+      }
+      #status {
+        font-size: 1.2rem;
+        margin-top: 20px;
+      }
+      #restartBtn {
+        padding: 10px 25px;
+        font-size: 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Tic Tac Toe with AI</h1>
+  <div id="game"></div>
+  <div id="status"></div>
+  <button id="restartBtn">Restart Game</button>
+
+  <script>
+    (() => {
+      const gameContainer = document.getElementById('game');
+      const statusDiv = document.getElementById('status');
+      const restartBtn = document.getElementById('restartBtn');
+
+      let board = ['', '', '', '', '', '', '', '', ''];
+      let player = 'X';      // Human is X
+      let ai = 'O';          // AI is O
+      let currentTurn = player;
+      let isGameOver = false;
+
+      const winningCombinations = [
+        [0,1,2],
+        [3,4,5],
+        [6,7,8],
+        [0,3,6],
+        [1,4,7],
+        [2,5,8],
+        [0,4,8],
+        [2,4,6]
+      ];
+
+      function createBoard() {
+        gameContainer.innerHTML = '';
+        for(let i = 0; i < 9; i++) {
+          const cell = document.createElement('div');
+          cell.classList.add('cell');
+          cell.dataset.index = i;
+          cell.addEventListener('click', onCellClick);
+          gameContainer.appendChild(cell);
+        }
+      }
+
+      function onCellClick(e) {
+        if (isGameOver || currentTurn !== player) return;
+
+        const idx = +e.target.dataset.index;
+        if (board[idx] !== '') return;
+
+        makeMove(idx, player);
+        if (!isGameOver) {
+          currentTurn = ai;
+          statusDiv.textContent = "AI is thinking...";
+          // Small delay for AI move
+          setTimeout(() => {
+            const aiMove = minimax(board, ai).index;
+            makeMove(aiMove, ai);
+            if (!isGameOver) {
+              currentTurn = player;
+              statusDiv.textContent = `Your turn (X)`;
+            }
+          }, 500);
+        }
+      }
+
+      function makeMove(index, symbol) {
+        if (board[index] === '' && !isGameOver) {
+          board[index] = symbol;
+          const cell = gameContainer.children[index];
+          cell.textContent = symbol;
+          cell.classList.add('taken');
+          if (symbol === player) {
+            cell.style.color = '#ffeb3b';
+          } else {
+            cell.style.color = '#90caf9';
+          }
+
+          if (checkWin(board, symbol)) {
+            isGameOver = true;
+            highlightWinnerCells(symbol);
+            statusDiv.textContent = symbol === player ? "You win! 🎉" : "AI wins! 💻";
+            return;
+          }
+
+          if (isBoardFull(board)) {
+            isGameOver = true;
+            statusDiv.textContent = "It's a draw! 🤝";
+            return;
+          }
+        }
+      }
+
+      function checkWin(bd, sym) {
+        return winningCombinations.some(combo =>
+          combo.every(i => bd[i] === sym)
+        );
+      }
+
+      function highlightWinnerCells(sym) {
+        winningCombinations.forEach(combo => {
+          if (combo.every(i => board[i] === sym)) {
+            combo.forEach(i => {
+              const c = gameContainer.children[i];
+              c.style.backgroundColor = sym === player ? '#ffeb3b' : '#90caf9';
+              c.style.color = '#333';
+              c.style.fontWeight = '900';
+              c.style.boxShadow = '0 0 15px 5px rgba(255, 235, 59, 0.7)';
+            });
+          }
+        });
+      }
+
+      function isBoardFull(bd) {
+        return bd.every(cell => cell !== '');
+      }
+
+      function minimax(newBoard, currentPlayer) {
+        // Available spots
+        const availSpots = newBoard.reduce((acc, val, idx) => (val === '' ? [...acc, idx] : acc), []);
+
+        // Check terminal states
+        if (checkWin(newBoard, player)) {
+          return { score: -10 };
+        } else if (checkWin(newBoard, ai)) {
+          return { score: 10 };
+        } else if (availSpots.length === 0) {
+          return { score: 0 };
+        }
+
+        const moves = [];
+
+        for (let i = 0; i < availSpots.length; i++) {
+          const idx = availSpots[i];
+          const move = {};
+          move.index = idx;
+          newBoard[idx] = currentPlayer;
+
+          if (currentPlayer === ai) {
+            const result = minimax(newBoard, player);
+            move.score = result.score;
+          } else {
+            const result = minimax(newBoard, ai);
+            move.score = result.score;
+          }
+
+          newBoard[idx] = '';
+          moves.push(move);
+        }
+
+        let bestMove;
+        if (currentPlayer === ai) {
+          let bestScore = -Infinity;
+          for (let i = 0; i < moves.length; i++) {
+            if (moves[i].score > bestScore) {
+              bestScore = moves[i].score;
+              bestMove = moves[i];
+            }
+          }
+        } else {
+          let bestScore = Infinity;
+          for (let i = 0; i < moves.length; i++) {
+            if (moves[i].score < bestScore) {
+              bestScore = moves[i].score;
+              bestMove = moves[i];
+            }
+          }
+        }
+        return bestMove;
+      }
+
+      restartBtn.addEventListener('click', () => {
+        board = ['', '', '', '', '', '', '', '', ''];
+        currentTurn = player;
+        isGameOver = false;
+        statusDiv.textContent = `Your turn (X)`;
+        createBoard();
+      });
+
+      // Initialize game
+      createBoard();
+      statusDiv.textContent = `Your turn (X)`;
+
+    })();
+  </script>
+</body>
+</html>
